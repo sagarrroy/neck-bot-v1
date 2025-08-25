@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # NeckHurts™ Discord Bot
 
 A feature-packed Discord bot for fun, utility, and remote Minecraft server control!
@@ -96,6 +95,4 @@ MIT License
 Enjoy your bot!  
 Feel free to add more
 =======
-# neck-bot
-my private bot for my very private server
->>>>>>> 2a28e823b27f880db67cab98d17793cb6cd149d7
+
