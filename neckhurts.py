@@ -1,3 +1,4 @@
+from asyncio import timeout
 import discord
 from discord.ext import commands
 from discord import ui
@@ -7,9 +8,9 @@ from dotenv import load_dotenv
 import stuff
 import paramiko #ssh wala
 import asyncio #time wala 
+import csv
 
 from google import genai  # for Gemini use
-
 
 load_dotenv()
 token = os.getenv("DISCORD_token")
@@ -37,27 +38,44 @@ async def on_message(message):
         return
     
     if message.content.lower().startswith('hello'):
-        await message.channel.send(f'{message.author.mention} {random.choice(stuff.greetings)}')
+        await message.reply(f'{random.choice(stuff.greetings)}')
 
     #emo boy
+
+    if message.author.id == 'kshitiz ka user id':
+        await message.reply("move on krle bsdk\n\n - *kritanshi*")
+
     if "kshitizz" in message.content.lower() or "emo" in message.content.lower():
+        await asyncio.sleep(1)
         await message.reply('https://tenor.com/view/emo-emo-kid-holding-back-meme-he-itchin-up-to-fye-emo-kid-clutching-emo-kid-gif-11947330188346210441')
-    
+
+    #burger king
+    if "nigger" in message.content.lower():
+        await asyncio.sleep(1)
+        await message.reply("https://tenor.com/view/billybobbu-moment-gif-6181302910520403962")
+    if ":)" in message.content.lower():
+        await asyncio.sleep(1)
+        await message.reply("https://tenor.com/view/smiley-face-burger-king-burger-king-happy-burger-king-whopper-burger-king-racism-gif-935276361237906854")
+
     #cornball gif
     if "bhutta ka gola" in message.content.lower() or "cornball" in message.content.lower() or "corn ball" in message.content.lower():
+        await asyncio.sleep(1)
         await message.reply('https://tenor.com/view/nxs-cube-cornball-ball-corn-gif-2361257093465839159')
     
     #doakes
     if "when you know" in message.content.lower():
+        await asyncio.sleep(1)
         await message.reply('https://tenor.com/view/watching-you-observe-seeing-i-saw-you-gif-5740825')
     
     #ghost of goon/goonicide
-    if "ghost of goons" in message.content.lower() or "goonicide" in message.content.lower():
+    if "ghost of goon" in message.content.lower() or "goonicide" in message.content.lower():
+        await asyncio.sleep(1)
         await message.reply('https://tenor.com/view/goonicide-icarus-icarusgoons-gif-15743754495342072857')
 
     #aman sudhi thing
-    if message.content.lower().startswith('babe'):
-        await message.channel.send(f'{message.author.mention}, she aint gon let u hit lil brochacho')
+    if "babe" in message.content.lower():
+        await asyncio.sleep(1)
+        await message.reply(f'{message.author.mention}, she aint gon let u hit lil brochacho')
 
 
     await bot.process_commands(message) # commands can work background me
@@ -122,10 +140,10 @@ async def premium(ctx):
 #toss command
 @bot.command()
 async def toss(ctx):
-    suspense = await ctx.send("Flipping the coin... 🪙")
-    await asyncio.sleep(1)
-    x = random.randint(0, 1)
-    result = "Heads" if x == 1 else "Tails"
+    toss_image = discord.File("images/toss.png")
+    suspense = await ctx.send("Flipping the coin... 🪙\n",file=toss_image)
+    await asyncio.sleep(2)
+    result = random.choice(["Heads", "Tails"])
     imagef = f"images/{result.lower()}.png"
     embed = discord.Embed(
         title="Toss!",
@@ -236,7 +254,258 @@ async def startserver(ctx):
 
 
 
+LEADERBOARD_FILE = "leaderboard.csv"
 
+if not os.path.exists(LEADERBOARD_FILE):
+    with open(LEADERBOARD_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["name", "wins", "losses"])
+
+
+def update_stats(player_name: str, won: bool):
+    rows = []
+    found = False
+
+    with open(LEADERBOARD_FILE, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        for row in reader:
+            if row["name"] == player_name:
+                found = True
+                row["wins"] = str(int(row["wins"]) + (1 if won else 0))
+                row["losses"] = str(int(row["losses"]) + (0 if won else 1))
+            rows.append(row)
+
+    if not found:
+        rows.append({"name": player_name, "wins": "1" if won else "0", "losses": "0" if won else "1"})
+
+    with open(LEADERBOARD_FILE, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(f, fieldnames=["name", "wins", "losses"])
+        writer.writeheader()
+        writer.writerows(rows)
+
+
+#------------------------ buttons n shit
+class ChallengeView(discord.ui.View):
+    def __init__(self, challenger: discord.Member, challenged: discord.Member, message: discord.Message):
+        super().__init__(timeout=30)
+        self.challenger = challenger
+        self.challenged = challenged
+        self.message = message
+        self.finished = False
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user != self.challenged:
+            await interaction.response.send_message("You're not the one being challenged!", ephemeral=True)
+            return False
+        return True
+
+    @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
+    async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.finished = True
+        embed = self.message.embeds[0].copy()
+        embed.description = f"🎯 {self.challenged.mention} **accepted** the challenge from {self.challenger.mention}!"
+        await interaction.response.edit_message(embed=embed, view=None)
+
+        # Start TicTacToe
+        game = TicTacToe(self.challenger, self.challenged)
+        await interaction.followup.send(f"{self.challenger.mention} (X) vs {self.challenged.mention} (O)", view=game)
+
+    @discord.ui.button(label="❌ Reject", style=discord.ButtonStyle.danger)
+    async def reject_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        self.finished = True
+        embed = self.message.embeds[0].copy()
+        embed.description = f"🚫 {self.challenged.mention} **rejected** the challenge from {self.challenger.mention}."
+        await interaction.response.edit_message(embed=embed, view=None)
+
+    async def on_timeout(self):
+        if self.finished:
+            return
+        embed = self.message.embeds[0].copy()
+        embed.description = f"⌛ Challenge expired! {self.challenged.mention} didn’t respond in time."
+        await self.message.edit(embed=embed, view=None)
+
+
+#------------------------ GAME
+class TicTacToeButton(discord.ui.Button):
+    def __init__(self, x: int, y: int):
+        super().__init__(label="\u200b", style=discord.ButtonStyle.secondary, row=y)
+        self.x = x
+        self.y = y
+
+    async def callback(self, interaction: discord.Interaction):
+        view: TicTacToe = self.view
+        if interaction.user != view.current_player:
+            await interaction.response.send_message("Not your turn!", ephemeral=True)
+            return
+        if self.label != "\u200b":
+            await interaction.response.send_message("That spot is taken!", ephemeral=True)
+            return
+
+        self.label = "X" if view.current_player == view.player_x else "O"
+        self.style = discord.ButtonStyle.danger if self.label == "X" else discord.ButtonStyle.primary
+        view.board[self.y][self.x] = self.label
+        view.moves += 1
+
+        winner = view.check_winner()
+        if winner or view.moves >= 9:
+            for child in view.children:
+                child.disabled = True
+            if winner:
+                content = f"🎉 {view.current_player.mention} ({self.label}) wins!"
+                update_stats(view.current_player.name, True)
+                loser = view.player_o if view.current_player == view.player_x else view.player_x
+                update_stats(loser.name, False)
+            else:
+                content = "🤝 It's a draw!"
+
+            await interaction.response.edit_message(content=content, view=view)
+            view.stop()
+        else:
+            view.current_player = view.player_o if view.current_player == view.player_x else view.player_x
+            await interaction.response.edit_message(content=f"{view.current_player.mention}'s turn", view=view)
+
+
+class TicTacToe(discord.ui.View):
+    def __init__(self, player_x: discord.Member, player_o: discord.Member):
+        super().__init__(timeout=None)
+        self.player_x = player_x
+        self.player_o = player_o
+        self.current_player = player_x
+        self.board = [[" "]*3 for _ in range(3)]
+        self.moves = 0
+
+        for y in range(3):
+            for x in range(3):
+                self.add_item(TicTacToeButton(x, y))
+
+    def check_winner(self):
+        b = self.board
+        lines = (
+            b[0], b[1], b[2],
+            [b[0][0], b[1][0], b[2][0]],
+            [b[0][1], b[1][1], b[2][1]],
+            [b[0][2], b[1][2], b[2][2]],
+            [b[0][0], b[1][1], b[2][2]],
+            [b[0][2], b[1][1], b[2][0]]
+        )
+        for line in lines:
+            if line[0] != " " and line.count(line[0]) == 3:
+                return line[0]
+        return None
+
+
+# ------------------- command for GAME
+@bot.command()
+async def tictactoe(ctx, member: discord.Member):
+    if member == ctx.author:
+        await ctx.send("You can't challenge yourself!")
+        return
+
+    embed = discord.Embed(
+        title="🎮 TicTacToe Challenge",
+        description=f"{ctx.author.mention} challenged {member.mention} to a showdown!",
+        color=discord.Color.blurple()
+    )
+    embed.set_footer(text="You have 30 seconds to respond.")
+
+    msg = await ctx.send(embed=embed)
+    await msg.edit(view=ChallengeView(ctx.author, member, msg))
+
+# tictactoe leaderboard
+@bot.command()
+async def leaderboard(ctx):
+    with open(LEADERBOARD_FILE, "r", newline="", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+        data = sorted(reader, key=lambda x: int(x["wins"]), reverse=True)
+
+    medals = ["🥇", "🥈", "🥉"]
+    embed = discord.Embed(title="🏆 TicTacToe Leaderboard", color=discord.Color.gold())
+
+    for i, row in enumerate(data[:5], start=1):
+        name = row["name"]
+        wins = row["wins"]
+        medal = medals[i-1] if i <= 3 else ""
+        embed.add_field(name=f"{i}. {medal} {name}", value=f"Wins: {wins}", inline=False)
+
+    await ctx.send(embed=embed)
+
+#-------------------chelp command
+@bot.command()
+async def commands(ctx):
+    embed = discord.Embed(
+        title="📜 NGA Bot Commands & Interactions",
+        description="Here’s everything you can do with this bot:",
+        color=discord.Color.blurple()
+    )
+
+    embed.add_field(
+        name="✨ Trigger Words",
+        value="Saying any of these will trigger special replies & GIFs:\n`kshitizz, :), bhutta ka gola, cornball, when you know, ghost of goon`",
+        inline=False
+    )
+
+    embed.add_field(
+        name="📢 `nga tellme`",
+        value="Sends a random fact, quote, or insight. Great for casual engagement.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="😂 `nga joke`",
+        value="Delivers a short, witty joke. Perfect for lightening the mood.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🪙 `nga toss`",
+        value="Simulates a coin toss. Returns Heads or Tails with optional embed.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="➕ `nga add <user> <score>`",
+        value="Adds a score to a user. Useful for tracking points or leaderboard logic.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="📊 `nga poll <question> | <option1> | <option2> | ...`",
+        value="Creates a reaction-based poll. Users vote via emoji reactions.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🚀 `nga startserver`",
+        value="Initializes server-specific settings or starts a session. Can be expanded to load configs, roles, or events.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="ℹ️ `nga help`",
+        value="Shows this help menu.",
+        inline=False
+    )
+    embed.add_field(
+        name="⭕ `nga challenge @user`",
+        value="Challenge someone to a TicTacToe match with Accept/Reject buttons. Game plays on a 3×3 button grid with auto win/draw detection.",
+        inline=False
+    )
+
+    embed.add_field(
+        name="🏆 `nga leaderboard`",
+        value="Shows the top 5 TicTacToe players ranked by wins. Includes 🥇🥈🥉 medals for top spots.",
+        inline=False
+    )
+
+    embed.set_footer(text="Tip: Commands start with `nga `. Use them exactly as shown.")
+
+    await ctx.send(embed=embed)
+
+
+def setup(bot):
+    @bot.command(name="help")
+    async def _help(ctx):
+        await help_command(ctx)
 
 
 
