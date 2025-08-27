@@ -133,6 +133,7 @@ async def premium(ctx):
         description="Unlock the most **premium** features of **NeckHurts™ AI** by purchasing a premium subscription!\nScan the QR Code below to buy the subscription at a SASA LELE PRICE of 99 RUPEES!",
         color=discord.Color.gold()
     )
+    embed.set_footer(text="Note: This is a ONE TIME subscription.")
     file = discord.File("images/qr.jpg")
     embed.set_image(url="attachment://qr.jpg")
     await ctx.reply(embed=embed, file=file)
