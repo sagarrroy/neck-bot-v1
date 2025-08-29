@@ -1,14 +1,14 @@
-from asyncio import timeout
-import discord
+import discord, random, os, asyncio , paramiko #timing,ssh
+from modules import stuff
 from discord.ext import commands
 from discord import ui
-import random
-import os 
 from dotenv import load_dotenv
-import stuff
-import paramiko #ssh wala
-import asyncio #time wala 
-import csv
+
+
+#game imports
+from games.trivia_game import setup_trivia
+from games.tictactoe import setup_tictactoe
+
 
 from google import genai  # for Gemini use
 
@@ -253,182 +253,8 @@ async def startserver(ctx):
     view = ServerControlView() if "✅" in status else None
     await ctx.send(embed=embed, view=view)
 
-
-
-LEADERBOARD_FILE = "leaderboard.csv"
-
-if not os.path.exists(LEADERBOARD_FILE):
-    with open(LEADERBOARD_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.writer(f)
-        writer.writerow(["name", "wins", "losses"])
-
-
-def update_stats(player_name: str, won: bool):
-    rows = []
-    found = False
-
-    with open(LEADERBOARD_FILE, "r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            if row["name"] == player_name:
-                found = True
-                row["wins"] = str(int(row["wins"]) + (1 if won else 0))
-                row["losses"] = str(int(row["losses"]) + (0 if won else 1))
-            rows.append(row)
-
-    if not found:
-        rows.append({"name": player_name, "wins": "1" if won else "0", "losses": "0" if won else "1"})
-
-    with open(LEADERBOARD_FILE, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=["name", "wins", "losses"])
-        writer.writeheader()
-        writer.writerows(rows)
-
-
-#------------------------ buttons n shit
-class ChallengeView(discord.ui.View):
-    def __init__(self, challenger: discord.Member, challenged: discord.Member, message: discord.Message):
-        super().__init__(timeout=30)
-        self.challenger = challenger
-        self.challenged = challenged
-        self.message = message
-        self.finished = False
-
-    async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user != self.challenged:
-            await interaction.response.send_message("You're not the one being challenged!", ephemeral=True)
-            return False
-        return True
-
-    @discord.ui.button(label="✅ Accept", style=discord.ButtonStyle.success)
-    async def accept_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.finished = True
-        embed = self.message.embeds[0].copy()
-        embed.description = f"🎯 {self.challenged.mention} **accepted** the challenge from {self.challenger.mention}!"
-        await interaction.response.edit_message(embed=embed, view=None)
-
-        # Start TicTacToe
-        game = TicTacToe(self.challenger, self.challenged)
-        await interaction.followup.send(f"{self.challenger.mention} (X) vs {self.challenged.mention} (O)", view=game)
-
-    @discord.ui.button(label="❌ Reject", style=discord.ButtonStyle.danger)
-    async def reject_button(self, interaction: discord.Interaction, button: discord.ui.Button):
-        self.finished = True
-        embed = self.message.embeds[0].copy()
-        embed.description = f"🚫 {self.challenged.mention} **rejected** the challenge from {self.challenger.mention}."
-        await interaction.response.edit_message(embed=embed, view=None)
-
-    async def on_timeout(self):
-        if self.finished:
-            return
-        embed = self.message.embeds[0].copy()
-        embed.description = f"⌛ Challenge expired! {self.challenged.mention} didn’t respond in time."
-        await self.message.edit(embed=embed, view=None)
-
-
-#------------------------ GAME
-class TicTacToeButton(discord.ui.Button):
-    def __init__(self, x: int, y: int):
-        super().__init__(label="\u200b", style=discord.ButtonStyle.secondary, row=y)
-        self.x = x
-        self.y = y
-
-    async def callback(self, interaction: discord.Interaction):
-        view: TicTacToe = self.view
-        if interaction.user != view.current_player:
-            await interaction.response.send_message("Not your turn!", ephemeral=True)
-            return
-        if self.label != "\u200b":
-            await interaction.response.send_message("That spot is taken!", ephemeral=True)
-            return
-
-        self.label = "X" if view.current_player == view.player_x else "O"
-        self.style = discord.ButtonStyle.danger if self.label == "X" else discord.ButtonStyle.primary
-        view.board[self.y][self.x] = self.label
-        view.moves += 1
-
-        winner = view.check_winner()
-        if winner or view.moves >= 9:
-            for child in view.children:
-                child.disabled = True
-            if winner:
-                content = f"🎉 {view.current_player.mention} ({self.label}) wins!"
-                update_stats(view.current_player.name, True)
-                loser = view.player_o if view.current_player == view.player_x else view.player_x
-                update_stats(loser.name, False)
-            else:
-                content = "🤝 It's a draw!"
-
-            await interaction.response.edit_message(content=content, view=view)
-            view.stop()
-        else:
-            view.current_player = view.player_o if view.current_player == view.player_x else view.player_x
-            await interaction.response.edit_message(content=f"{view.current_player.mention}'s turn", view=view)
-
-
-class TicTacToe(discord.ui.View):
-    def __init__(self, player_x: discord.Member, player_o: discord.Member):
-        super().__init__(timeout=None)
-        self.player_x = player_x
-        self.player_o = player_o
-        self.current_player = player_x
-        self.board = [[" "]*3 for _ in range(3)]
-        self.moves = 0
-
-        for y in range(3):
-            for x in range(3):
-                self.add_item(TicTacToeButton(x, y))
-
-    def check_winner(self):
-        b = self.board
-        lines = (
-            b[0], b[1], b[2],
-            [b[0][0], b[1][0], b[2][0]],
-            [b[0][1], b[1][1], b[2][1]],
-            [b[0][2], b[1][2], b[2][2]],
-            [b[0][0], b[1][1], b[2][2]],
-            [b[0][2], b[1][1], b[2][0]]
-        )
-        for line in lines:
-            if line[0] != " " and line.count(line[0]) == 3:
-                return line[0]
-        return None
-
-
-# ------------------- command for GAME
-@bot.command()
-async def tictactoe(ctx, member: discord.Member):
-    if member == ctx.author:
-        await ctx.send("You can't challenge yourself!")
-        return
-
-    embed = discord.Embed(
-        title="🎮 TicTacToe Challenge",
-        description=f"{ctx.author.mention} challenged {member.mention} to a showdown!",
-        color=discord.Color.blurple()
-    )
-    embed.set_footer(text="You have 30 seconds to respond.")
-
-    msg = await ctx.send(embed=embed)
-    await msg.edit(view=ChallengeView(ctx.author, member, msg))
-
-# tictactoe leaderboard
-@bot.command()
-async def leaderboard(ctx):
-    with open(LEADERBOARD_FILE, "r", newline="", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        data = sorted(reader, key=lambda x: int(x["wins"]), reverse=True)
-
-    medals = ["🥇", "🥈", "🥉"]
-    embed = discord.Embed(title="🏆 TicTacToe Leaderboard", color=discord.Color.gold())
-
-    for i, row in enumerate(data[:5], start=1):
-        name = row["name"]
-        wins = row["wins"]
-        medal = medals[i-1] if i <= 3 else ""
-        embed.add_field(name=f"{i}. {medal} {name}", value=f"Wins: {wins}", inline=False)
-
-    await ctx.send(embed=embed)
+# ------------------------ TICTACTOE GAME IMPORT
+setup_tictactoe(bot)
 
 #-------------------chelp command
 @bot.command()
@@ -505,10 +331,12 @@ async def commands(ctx):
 
 def setup(bot):
     @bot.command(name="help")
-    async def _help(ctx):
+    async def help(ctx):
         await help_command(ctx)
 
-
+#----------------------
+# --------------------- trivia battleroyale game call
+setup_trivia(bot)
 
 
 bot.run(token)
