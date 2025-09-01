@@ -155,8 +155,8 @@ async def start_trivia(ctx: commands.Context, players: List[discord.User]):
     global question_pool
 
     # TIME LIMITS PER PLAYERS REMAINING
-    timer_map = {5: 20, 4: 18, 3: 15, 2: 12}
-    default_time_limit = 9  # FINAL LIGHTNING ROUNDS
+    timer_map = {5: 12, 4: 10, 3: 9, 2: 8}
+    default_time_limit = 6  # FINAL LIGHTNING ROUNDS
 
     round_number = 1
     spectators_ids: Set[int] = set()

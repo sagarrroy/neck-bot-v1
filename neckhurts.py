@@ -49,6 +49,11 @@ async def on_message(message):
         await asyncio.sleep(1)
         await message.reply('https://tenor.com/view/emo-emo-kid-holding-back-meme-he-itchin-up-to-fye-emo-kid-clutching-emo-kid-gif-11947330188346210441')
 
+    if "kshitizzz" == message.content.lower():
+        await asyncio.sleep(1)
+        file = discord.File("images/kaayar.jpg")
+        await message.reply(file=file)
+
     #burger king
     if "nigger" in message.content.lower():
         await asyncio.sleep(1)
@@ -56,6 +61,10 @@ async def on_message(message):
     if ":)" in message.content.lower():
         await asyncio.sleep(1)
         await message.reply("https://tenor.com/view/smiley-face-burger-king-burger-king-happy-burger-king-whopper-burger-king-racism-gif-935276361237906854")
+
+    if "shayan" in message.content.lower():
+        await asyncio.sleep(1)
+        await message.reply(file=discord.File("images/shayan.png"))
 
     #cornball gif
     if "bhutta ka gola" in message.content.lower() or "cornball" in message.content.lower() or "corn ball" in message.content.lower():
