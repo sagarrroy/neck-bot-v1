@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 #game imports
 from games.trivia_game import setup_trivia
 from games.tictactoe import setup_tictactoe
+from games.rps import setup_rps
+
 
 
 from google import genai  # for Gemini use
@@ -347,5 +349,7 @@ def setup(bot):
 # --------------------- trivia battleroyale game call
 setup_trivia(bot)
 
+#----------------------- ROCK PAPER SCICSOS call
+setup_rps(bot)
 
 bot.run(token)
